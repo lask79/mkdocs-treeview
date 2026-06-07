@@ -1,0 +1,5 @@
+site_name: Treeview Demo
+docs_dir: docs
+plugins:
+  - treeview:
+      icon_mode: embedded

@@ -1,0 +1,7 @@
+site_name: Treeview Demo (Material)
+docs_dir: docs
+theme:
+  name: material
+plugins:
+  - treeview:
+      icon_mode: embedded

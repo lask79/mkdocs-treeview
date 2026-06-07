@@ -1,0 +1,73 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mkdocs-treeview"
+version = "0.1.0"
+description = "MkDocs plugin and Markdown extension for rendering ASCII file trees with material icons"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+dependencies = [
+    "mkdocs>=1.5",
+    "markdown>=3.4",
+]
+
+[project.entry-points."mkdocs.plugins"]
+treeview = "mkdocs_treeview.plugin:TreeviewPlugin"
+
+[project.entry-points."markdown.extensions"]
+treeview = "mkdocs_treeview.extension:TreeviewExtension"
+
+[tool.hatch.build.targets.wheel]
+include = [
+    "mkdocs_treeview/**",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "mkdocs_treeview/**",
+    "tests/**",
+    "scripts/**",
+    "pyproject.toml",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    ".pre-commit-config.yaml",
+]
+exclude = [
+    "tests/demos/zensical/.cache/**",
+    "tests/demos/*/site/**",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/visual/generate_preview.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+disallow_untyped_defs = true
+warn_return_any = true
+warn_unused_ignores = true
+disallow_subclassing_any = false
+exclude = ["mkdocs_treeview/icon_map\\.py"]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+    "playwright>=1.60.0",
+    "pre-commit>=4.3.0",
+    "ruff>=0.15.16",
+    "pytest>=7",
+    "pytest-cov",
+    "mkdocs-material",
+    "zensical>=0.0.2",
+]

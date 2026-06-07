@@ -1,0 +1,240 @@
+#!/usr/bin/env python3
+"""
+Build script for mkdocs-treeview icon assets.
+
+Downloads material-icon-theme from npm, extracts the pre-built manifest
+(dist/material-icons.json) and all SVG icons, then generates:
+  - mkdocs_treeview/icon_map.py   (Python lookup tables)
+  - mkdocs_treeview/icons/        (SVG files)
+
+Requirements (dev only): Node.js / npm
+
+Run from the repo root:
+    python3 scripts/build_icons.py
+    python3 scripts/build_icons.py --version 5.35.0
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+from pathlib import Path
+
+DEFAULT_VERSION = "5.35.0"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+PKG_DIR = REPO_ROOT / "mkdocs_treeview"
+OUT_ICONS_DIR = PKG_DIR / "icons"
+OUT_MAP = PKG_DIR / "icon_map.py"
+
+
+# ── npm download ──────────────────────────────────────────────────────────────
+
+
+def download_npm_package(version: str, dest_dir: Path) -> Path:
+    """Run `npm pack material-icon-theme@<version>` and return the tarball path."""
+    print(f"Downloading material-icon-theme@{version} from npm…")
+    result = subprocess.run(
+        ["npm", "pack", f"material-icon-theme@{version}", "--pack-destination", str(dest_dir)],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        print("ERROR: npm pack failed:", file=sys.stderr)
+        print(result.stderr, file=sys.stderr)
+        sys.exit(1)
+
+    tarball_name = result.stdout.strip().splitlines()[-1]
+    tarball = dest_dir / tarball_name
+    if not tarball.exists():
+        # npm may print just the filename or the full path
+        tarball = next(dest_dir.glob("*.tgz"), None)
+    if tarball is None or not tarball.exists():
+        print("ERROR: could not find downloaded tarball", file=sys.stderr)
+        sys.exit(1)
+    return tarball
+
+
+def extract_package(tarball: Path, dest_dir: Path) -> Path:
+    """Extract the npm tarball and return the package root directory."""
+    with tarfile.open(tarball, "r:gz") as tf:
+        tf.extractall(dest_dir)
+    # npm tarballs always unpack into a `package/` subdirectory
+    pkg = dest_dir / "package"
+    if not pkg.exists():
+        print("ERROR: expected `package/` directory in tarball", file=sys.stderr)
+        sys.exit(1)
+    return pkg
+
+
+# ── Map extraction ────────────────────────────────────────────────────────────
+
+
+def extract_maps(manifest: dict) -> dict:
+    """
+    Parse dist/material-icons.json manifest into lookup dicts.
+
+    Manifest top-level keys:
+      iconDefinitions: { icon_name -> { iconPath: "./../icons/foo.svg" } }
+      fileExtensions:  { ext -> icon_name }
+      fileNames:       { filename -> icon_name }
+      folderNames:     { foldername -> icon_name }
+      languageIds:     { lang_id -> icon_name }
+      light:           { fileExtensions, fileNames, folderNames } (light-mode overrides)
+    """
+    defs: dict[str, str] = {}
+    for name, defn in manifest.get("iconDefinitions", {}).items():
+        icon_path = defn.get("iconPath", "")
+        defs[name] = Path(icon_path).name  # e.g. "python.svg"
+
+    def resolve(name: str) -> str:
+        return defs.get(name, f"{name}.svg")
+
+    light = manifest.get("light", {})
+
+    file_ext1: dict[str, str] = {}
+    file_ext1_light: dict[str, str] = {}
+    for ext, icon in manifest.get("fileExtensions", {}).items():
+        file_ext1[ext] = resolve(icon)
+    for ext, icon in light.get("fileExtensions", {}).items():
+        file_ext1_light[ext] = resolve(icon)
+
+    file_names: dict[str, str] = {}
+    file_names_light: dict[str, str] = {}
+    for fname, icon in manifest.get("fileNames", {}).items():
+        file_names[fname] = resolve(icon)
+    for fname, icon in light.get("fileNames", {}).items():
+        file_names_light[fname] = resolve(icon)
+
+    folder_names: dict[str, str] = {}
+    folder_names_light: dict[str, str] = {}
+    for fname, icon in manifest.get("folderNames", {}).items():
+        folder_names[fname] = resolve(icon)
+    for fname, icon in light.get("folderNames", {}).items():
+        folder_names_light[fname] = resolve(icon)
+
+    language_ids: dict[str, str] = {}
+    for lang, icon in manifest.get("languageIds", {}).items():
+        language_ids[lang] = resolve(icon)
+
+    return {
+        "file_names": file_names,
+        "file_names_light": file_names_light,
+        "file_ext1": file_ext1,
+        "file_ext1_light": file_ext1_light,
+        "folder_names": folder_names,
+        "folder_names_light": folder_names_light,
+        "language_ids": language_ids,
+    }
+
+
+# ── Output generation ─────────────────────────────────────────────────────────
+
+
+def _dict_repr(d: dict[str, str]) -> str:
+    lines = ["{"]
+    for k, v in sorted(d.items()):
+        lines.append(f"    {k!r}: {v!r},")
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def write_icon_map(data: dict, version: str) -> None:
+    content = f"""\
+# Generated by scripts/build_icons.py — do not edit manually.
+# Source: material-icon-theme@{version} (npm)
+# Re-run `python3 scripts/build_icons.py` to regenerate.
+
+FILE_NAMES = {_dict_repr(data["file_names"])}
+
+FILE_NAMES_LIGHT = {_dict_repr(data["file_names_light"])}
+
+FILE_EXT1 = {_dict_repr(data["file_ext1"])}
+
+FILE_EXT1_LIGHT = {_dict_repr(data["file_ext1_light"])}
+
+FOLDER_NAMES = {_dict_repr(data["folder_names"])}
+
+FOLDER_NAMES_LIGHT = {_dict_repr(data["folder_names_light"])}
+
+LANGUAGE_IDS = {_dict_repr(data["language_ids"])}
+"""
+    OUT_MAP.write_text(content, encoding="utf-8")
+    print(f"Wrote {OUT_MAP}")
+
+
+def copy_icons(pkg_icons_dir: Path) -> int:
+    OUT_ICONS_DIR.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for svg in pkg_icons_dir.glob("*.svg"):
+        shutil.copy2(svg, OUT_ICONS_DIR / svg.name)
+        count += 1
+
+    # Synthesize -open folder variants if absent.
+    # The npm package includes pre-built open variants generated by
+    # generateOpenFolders, so this is mostly a safety net.
+    for closed in list(OUT_ICONS_DIR.glob("folder-*.svg")):
+        if "-open" in closed.stem:
+            continue
+        open_path = OUT_ICONS_DIR / (closed.stem + "-open.svg")
+        if not open_path.exists():
+            shutil.copy2(closed, open_path)
+
+    # Ensure generic fallbacks exist
+    for fallback in ("file.svg", "folder.svg"):
+        dest = OUT_ICONS_DIR / fallback
+        if not dest.exists():
+            dest.write_text(
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+                '<rect width="24" height="24" rx="2" fill="#90a4ae"/>'
+                "</svg>",
+                encoding="utf-8",
+            )
+
+    print(f"Copied {count} SVG files to {OUT_ICONS_DIR}")
+    return 0
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--version", default=DEFAULT_VERSION, help="npm package version")
+    args = parser.parse_args()
+    version: str = args.version
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        tarball = download_npm_package(version, tmp_path)
+        pkg = extract_package(tarball, tmp_path)
+
+        manifest_path = pkg / "dist" / "material-icons.json"
+        if not manifest_path.exists():
+            print(f"ERROR: {manifest_path} not found in package", file=sys.stderr)
+            return 1
+
+        print("Parsing manifest…")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        data = extract_maps(manifest)
+
+        write_icon_map(data, version)
+        rc = copy_icons(pkg / "icons")
+
+    print(
+        f"\nSummary:"
+        f"\n  file names:    {len(data['file_names'])}"
+        f"\n  file ext1:     {len(data['file_ext1'])}"
+        f"\n  folder names:  {len(data['folder_names'])}"
+        f"\n  language IDs:  {len(data['language_ids'])}"
+    )
+    return rc
+
+
+if __name__ == "__main__":
+    sys.exit(main())

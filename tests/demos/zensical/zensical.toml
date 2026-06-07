@@ -1,0 +1,10 @@
+[project]
+site_name = "Treeview Demo"
+extra_css = ["stylesheets/treeview.css"]
+
+[[project.theme.palette]]
+scheme = "default"
+
+[project.markdown_extensions."mkdocs_treeview.extension"]
+css_output_path = "docs/stylesheets/treeview.css"
+icon_mode = "embedded"
