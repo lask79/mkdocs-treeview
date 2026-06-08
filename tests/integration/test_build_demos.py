@@ -150,8 +150,15 @@ def zensical_demo() -> Path:
     docs = root / "docs"
     docs.mkdir()
     (docs / "treeview.md").write_text(TREEVIEW_MD, encoding="utf-8")
-    # Zensical requires at least an index page
-    (docs / "index.md").write_text("# Home\n\nSee [Treeview](treeview.md).\n", encoding="utf-8")
+    # Second page with a distinct icon (Rust) not present on treeview.md.
+    # Proves the CSS accumulates icons across pages instead of only keeping
+    # the last page's icons.
+    (docs / "extra.md").write_text(
+        "# Extra\n\n```treeview\n└── main.rs\n```\n", encoding="utf-8"
+    )
+    (docs / "index.md").write_text(
+        "# Home\n\nSee [Treeview](treeview.md) and [Extra](extra.md).\n", encoding="utf-8"
+    )
 
     (root / "zensical.toml").write_text(
         textwrap.dedent("""\
@@ -199,9 +206,21 @@ def test_zensical_demo_css_linked_in_html(zensical_demo: Path):
 
 
 def test_zensical_demo_css_is_lean(zensical_demo: Path):
-    """Generated CSS contains only the icons actually used (dynamic, not 1.3 MB)."""
+    """Generated CSS contains only the icons actually used (dynamic, not 1.3 MB).
+
+    The manifest lives in .cache/ (a build artifact, not part of the served site).
+    The CSS itself stays in docs/stylesheets/ where extra_css points to it.
+    """
     css_path = zensical_demo / "docs" / "stylesheets" / "treeview.css"
     assert css_path.exists(), "treeview.css not written — TreeviewCSSPostprocessor did not run"
+
+    manifest_path = zensical_demo / ".cache" / "treeview.manifest.json"
+    assert manifest_path.exists(), (
+        ".cache/treeview.manifest.json not written — manifest should be in .cache/, not docs/"
+    )
+    assert not (zensical_demo / "docs" / "stylesheets" / "treeview.css.manifest.json").exists(), (
+        "manifest must not appear in docs/ — it should be in .cache/"
+    )
 
     css = css_path.read_text(encoding="utf-8")
 
@@ -212,7 +231,13 @@ def test_zensical_demo_css_is_lean(zensical_demo: Path):
     for cls in EXPECTED_ICONS:
         assert cls in css, f"expected icon class '{cls}' missing from CSS"
 
-    # Sanity: file is small — only 6 icons, not 1120
+    # Icon from extra.md (second page) must also be present — proves the
+    # registry accumulates icons across all pages, not just the last one.
+    assert "tv-icon-rust" in css, (
+        "Rust icon (from extra.md) missing — CSS only contains last page's icons"
+    )
+
+    # Sanity: file is small — only ~7 icons, not 1120
     size = css_path.stat().st_size
     assert size < 50_000, (
         f"CSS is {size} bytes — looks like all icons were embedded instead of only used ones"

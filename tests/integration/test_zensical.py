@@ -142,6 +142,57 @@ def test_zensical_multiple_trees_in_one_page(zensical_config):
     assert "beta.py" in html
 
 
+def test_zensical_css_accumulates_icons_across_multiple_pages(tmp_path: Path):
+    """CSS file must contain icons from ALL pages, not just the last one rendered.
+
+    Simulates the real zensical.toml production path: extension loaded as a
+    module string so Python-Markdown calls makeExtension() — and therefore
+    creates a fresh IconRegistry — on every page render.  The fix requires
+    that the registry survive across pages so that the CSS written after page N
+    contains every icon seen from page 1 through page N.
+    """
+    import zensical.config as zc
+
+    from mkdocs_treeview.extension import TreeviewExtension
+
+    css_path = tmp_path / "treeview.css"
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "index.md").write_text("# placeholder", encoding="utf-8")
+    (tmp_path / "mkdocs.yml").write_text("site_name: Test\n", encoding="utf-8")
+
+    zc.parse_mkdocs_config(str(tmp_path / "mkdocs.yml"))
+    config = zc.get_config()
+
+    # Load the extension as a string — exactly what zensical.toml does.
+    # This means Python-Markdown calls makeExtension() on each render() call,
+    # giving each page its own fresh IconRegistry unless we persist state.
+    config["markdown_extensions"] = [
+        e for e in config["markdown_extensions"] if not isinstance(e, TreeviewExtension)
+    ]
+    config["markdown_extensions"].append("mkdocs_treeview.extension")
+    config["mdx_configs"]["mkdocs_treeview.extension"] = {
+        "css_output_path": str(css_path),
+        "icon_mode": "embedded",
+        "manifest_path": str(tmp_path / ".cache" / "treeview.manifest.json"),
+    }
+
+    from zensical.markdown.render import render
+
+    # Page 1: Python file
+    render("```treeview\n└── main.py\n```", "page1.md", "/page1/")
+    # Page 2: TypeScript file (different icon, different registry if bug is present)
+    render("```treeview\n└── app.ts\n```", "page2.md", "/page2/")
+
+    assert css_path.exists(), "CSS file was not written"
+    css = css_path.read_text(encoding="utf-8")
+
+    # Both pages' icons must be present; if page-1 icons are missing the
+    # registry was reset on page 2 (the bug).
+    assert "tv-icon-python" in css, "Python icon missing from CSS — page 1 icons were lost"
+    assert "tv-icon-typescript" in css, "TypeScript icon missing — page 2 icons absent"
+
+
 def test_zensical_plain_markdown_unaffected(zensical_config):
     """Regular Markdown outside treeview fences is unaffected by the extension."""
     from zensical.markdown.render import render

@@ -1137,6 +1137,10 @@ source = { editable = "." }
 dependencies = [
     { name = "markdown", version = "3.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "markdown", version = "3.10.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+]
+
+[package.optional-dependencies]
+mkdocs = [
     { name = "mkdocs" },
 ]
 
@@ -1159,8 +1163,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "markdown", specifier = ">=3.4" },
-    { name = "mkdocs", specifier = ">=1.5" },
+    { name = "mkdocs", marker = "extra == 'mkdocs'", specifier = ">=1.5" },
 ]
+provides-extras = ["mkdocs"]
 
 [package.metadata.requires-dev]
 dev = [
