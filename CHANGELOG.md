@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.3] - 2026-06-08
+
+- Fixed some PyPI configs in `pyproject.toml`
+
+## [0.2.2] - 2026-06-08
+
+- Fixed some PyPI configs in `pyproject.toml`
+
 ## [0.2.1] - 2026-06-08
 
 - Changed some PyPI configs in `pyproject.toml`
