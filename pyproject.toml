@@ -10,9 +10,11 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
 dependencies = [
-    "mkdocs>=1.5",
     "markdown>=3.4",
 ]
+
+[project.optional-dependencies]
+mkdocs = ["mkdocs>=1.5"]
 
 [project.entry-points."mkdocs.plugins"]
 treeview = "mkdocs_treeview.plugin:TreeviewPlugin"

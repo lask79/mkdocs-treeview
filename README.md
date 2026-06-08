@@ -21,7 +21,7 @@ Inspired by [asciidoctor-treeview](https://github.com/lask79/asciidoctor-treevie
 
 | Light | Dark |
 |:---:|:---:|
-| ![Treeview light theme](docs/images/treeview-light.png) | ![Treeview dark theme](docs/images/treeview-dark.png) |
+| ![Treeview light theme](https://raw.githubusercontent.com/lask79/mkdocs-treeview/main/docs/images/treeview-light.png) | ![Treeview dark theme](https://raw.githubusercontent.com/lask79/mkdocs-treeview/main/docs/images/treeview-dark.png) |
 
 ---
 
@@ -121,6 +121,18 @@ icon_mode = "embedded"
 `css_output_path` is resolved relative to the directory where `zensical build` is
 run (the project root). The extension writes a lean CSS file there after each page.
 
+**Add `.cache/` to your `.gitignore`:**
+
+```text
+.cache/
+```
+
+The extension writes a manifest file to `.cache/treeview.manifest.json` to
+accumulate icon data across pages. Zensical isolates each page render in its
+own Python sub-interpreter, so this file is the mechanism that lets the final
+CSS contain icons from *all* pages rather than just the last one rendered.
+The manifest is a build artifact — do not commit it.
+
 ---
 
 ## Asset modes
@@ -141,8 +153,11 @@ HTML with `tv-icon tv-icon-<name>` CSS classes. After the build, `on_post_build`
 writes a lean CSS file containing only the icons that were actually rendered.
 
 For Zensical, `TreeviewCSSPostprocessor` writes the CSS file after every page.
-Because the extension object persists across all `render()` calls, the registry
-accumulates icons across pages. The final write contains the complete lean CSS.
+Zensical isolates each page render in its own Python sub-interpreter, so the
+extension cannot keep an in-memory registry across pages. Instead, the extension
+persists the accumulated icon registry to `.cache/treeview.manifest.json` on
+disk. Each page render merges its icons into that file, then regenerates the
+full CSS. The final CSS contains every icon used across the entire site.
 
 ---
 

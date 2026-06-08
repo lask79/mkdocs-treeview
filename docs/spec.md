@@ -174,9 +174,80 @@ to the output. Unused icons are not shipped.
 - **MkDocs / Material**: icons accumulate in `IconRegistry` during page
   renders; `on_post_build` writes CSS once, containing only used icons.
 - **Zensical**: `TreeviewCSSPostprocessor` (Python-Markdown `Postprocessor`,
-  priority 0) writes CSS after every page. Since the extension object persists
-  across all `render()` calls, the registry accumulates icons across pages.
-  The final write contains the complete, lean CSS for the whole site.
+  priority 0) writes CSS after every page. Because Zensical's Rust core spawns
+  a fresh Python sub-interpreter for each page render, module-level state
+  (like the `IconRegistry`) is reset between pages. A JSON manifest file
+  persists the accumulated icon registry across these interpreter boundaries.
+  See [Zensical multi-page accumulation](#zensical-multi-page-accumulation).
+
+---
+
+## Zensical multi-page accumulation
+
+### Problem
+
+Zensical's Rust binary spawns a fresh Python sub-interpreter for each page
+render. This means every call to `zensical.markdown.render.render()` starts
+with a clean Python state — module-level singletons, including the
+`IconRegistry`, are reset to their initial values. If the CSS were rewritten
+from the current page's registry alone, each page would overwrite the CSS with
+only its own icons, discarding all icons from previously rendered pages.
+
+### Solution: filesystem manifest
+
+`TreeviewCSSPostprocessor` uses a JSON manifest file to persist the full icon
+registry across interpreter boundaries:
+
+1. Before writing CSS, load the manifest from disk (if it exists).
+2. Merge the current page's icons into the loaded manifest.
+3. Save the updated manifest back to disk.
+4. Regenerate the full CSS from the merged manifest.
+
+Every write is additive — no previously seen icon is ever discarded. After the
+last page is rendered, the CSS contains every icon used across the entire site.
+
+### Manifest location
+
+The manifest is written to `.cache/<css_stem>.manifest.json` relative to the
+CWD at build time (i.e., the project root). For the default config:
+
+```toml
+css_output_path = "docs/stylesheets/treeview.css"
+```
+
+The manifest is written to:
+
+```text
+.cache/treeview.manifest.json
+```
+
+The `.cache/` directory is a build artifact. Add it to `.gitignore`:
+
+```text
+.cache/
+```
+
+The CSS file itself (`docs/stylesheets/treeview.css`) stays where `extra_css`
+points. The manifest is not served — it is only read and written by the
+extension during a build.
+
+### `zensical serve` behaviour
+
+During `zensical serve`, the manifest accumulates icons as pages are rebuilt.
+Icons are never removed from the manifest — if you delete a treeview block,
+its icon class remains in the CSS until you delete `.cache/` and rebuild. This
+is acceptable v1 behaviour; a future version may support manifest pruning.
+
+### Optional `manifest_path` kwarg
+
+For non-standard setups or tests, override the manifest location explicitly:
+
+```toml
+[project.markdown_extensions."mkdocs_treeview.extension"]
+css_output_path = "docs/stylesheets/treeview.css"
+icon_mode = "embedded"
+manifest_path = ".cache/treeview.manifest.json"   # optional, this is the default
+```
 
 ---
 
@@ -220,10 +291,15 @@ extra_css = ["stylesheets/treeview.css"]
 [project.markdown_extensions."mkdocs_treeview.extension"]
 css_output_path = "docs/stylesheets/treeview.css"
 icon_mode = "embedded"
+# manifest_path defaults to .cache/<css_stem>.manifest.json relative to CWD
 ```
 
 `css_output_path` must be absolute or relative to the CWD at build time
 (the project root where `zensical build` is run).
+
+The manifest file (`.cache/treeview.manifest.json`) is a build artifact that
+persists the icon registry across Zensical's per-page Python sub-interpreters.
+Add `.cache/` to your project's `.gitignore`.
 
 ---
 

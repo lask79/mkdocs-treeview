@@ -4,6 +4,7 @@ Python-Markdown extension for treeview fenced code blocks.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -59,13 +60,14 @@ class TreeviewPreprocessor(Preprocessor):
 
 
 class TreeviewCSSPostprocessor(Postprocessor):
-    """Writes a lean CSS file containing only the icons used so far.
+    """Writes a lean CSS file accumulating icons from all rendered pages.
 
-    Registered when css_output_path is set on TreeviewExtension. Since
-    Zensical (and similar pipelines) create a new Markdown() instance per
-    page, this runs after every page. The registry accumulates icons across
-    all pages; each write overwrites the previous file. By the last page the
-    file contains exactly the icons referenced across the whole site.
+    Registered when css_output_path is set on TreeviewExtension. Zensical's
+    Rust core isolates each page render in its own Python sub-interpreter, so
+    module-level state cannot be shared across pages. Instead, a JSON manifest
+    (css_output_path + ".manifest.json") persists the full icon registry on
+    disk. Each page render merges its icons into the manifest, then regenerates
+    the CSS. Every write is additive — no previously seen icon is ever lost.
     """
 
     def __init__(
@@ -75,24 +77,54 @@ class TreeviewCSSPostprocessor(Postprocessor):
         css_output_path: Path,
         icon_mode: str,
         icons_dir: Path,
+        manifest_path: Path | None = None,
     ):
         super().__init__(md)
         self.registry = registry
         self.css_output_path = css_output_path
+        self.manifest_path = manifest_path or (
+            Path.cwd() / ".cache" / f"{css_output_path.stem}.manifest.json"
+        )
         self.icon_mode = icon_mode
         self.icons_dir = icons_dir
 
+    def _load_manifest(self) -> dict[str, tuple[str, str]]:
+        """Load the persisted icon registry from disk, or return empty dict."""
+        if not self.manifest_path.exists():
+            return {}
+        try:
+            data = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+            return {cls: tuple(pair) for cls, pair in data.items()}  # type: ignore[misc]
+        except Exception:
+            return {}
+
+    def _save_manifest(self, registry: dict[str, tuple[str, str]]) -> None:
+        self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        self.manifest_path.write_text(
+            json.dumps(registry, indent=2), encoding="utf-8"
+        )
+
     def run(self, text: str) -> str:
-        icons = self.registry.items()
-        if icons:
-            self.css_output_path.parent.mkdir(parents=True, exist_ok=True)
-            css = generate_css(
-                icons=icons,
-                icon_mode=self.icon_mode,
-                icons_dir=self.icons_dir if self.icon_mode == "embedded" else None,
-                assets_path="icons",
-            )
-            self.css_output_path.write_text(css, encoding="utf-8")
+        this_page_icons = self.registry.items()
+        if not this_page_icons:
+            return text
+
+        # Merge this page's icons into the persisted manifest.
+        manifest = self._load_manifest()
+        for cls, dark, light in this_page_icons:
+            manifest[cls] = (dark, light)
+
+        self.css_output_path.parent.mkdir(parents=True, exist_ok=True)
+        self._save_manifest(manifest)
+
+        merged = [(cls, dark, light) for cls, (dark, light) in manifest.items()]
+        css = generate_css(
+            icons=merged,
+            icon_mode=self.icon_mode,
+            icons_dir=self.icons_dir if self.icon_mode == "embedded" else None,
+            assets_path="icons",
+        )
+        self.css_output_path.write_text(css, encoding="utf-8")
         return text
 
 
@@ -114,6 +146,9 @@ class TreeviewExtension(Extension):
             Path(kwargs.pop("css_output_path")) if "css_output_path" in kwargs else None
         )
         self._icon_mode: str = kwargs.pop("icon_mode", "embedded")
+        self._manifest_path: Path | None = (
+            Path(kwargs.pop("manifest_path")) if "manifest_path" in kwargs else None
+        )
         super().__init__(**kwargs)
 
     def extendMarkdown(self, md: Any) -> None:
@@ -133,6 +168,7 @@ class TreeviewExtension(Extension):
                     self._css_output_path,
                     self._icon_mode,
                     ICONS_PKG_DIR,
+                    manifest_path=self._manifest_path,
                 ),
                 "treeview_css",
                 # Priority 0: run last, after all HTML is finalised.
