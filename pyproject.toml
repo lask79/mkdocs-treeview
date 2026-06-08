@@ -4,14 +4,38 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mkdocs-treeview"
-version = "0.2.0"
+version = "0.2.1"
 description = "MkDocs plugin and Markdown extension for rendering ASCII file trees with material icons"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
+authors = [
+    { name = "Lasse Knudsen" },
+]
+keywords = ["mkdocs", "mkdocs-plugin", "markdown", "treeview", "icons", "material-icons"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Documentation",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Text Processing :: Markup :: HTML",
+]
 dependencies = [
     "markdown>=3.4",
 ]
+
+[project.urls]
+Homepage = "https://github.com/lknudsen/markdown-treeview"
+Repository = "https://github.com/lknudsen/markdown-treeview"
+Issues = "https://github.com/lknudsen/markdown-treeview/issues"
+Changelog = "https://github.com/lknudsen/markdown-treeview/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 mkdocs = ["mkdocs>=1.5"]
