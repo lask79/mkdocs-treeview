@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.0] - 2026-06-08
+
+### Fixed
+
+- **Zensical multi-page CSS accumulation** ([#1](https://github.com/knudsen/markdown-treeview/pull/1)): Zensical's Rust core spawns a fresh Python sub-interpreter per page, resetting module-level state including the `IconRegistry`. Icons from earlier pages were dropped, leaving later pages with incomplete CSS. Fixed by persisting the icon registry to a JSON manifest file (`.cache/treeview.manifest.json`) between page renders. Each page merges its icons into the manifest before regenerating CSS, so the final stylesheet contains every icon used across the entire site. Add `.cache/` to `.gitignore`.
+
 ## [0.1.0] - 2026-06-07
 
 Initial release.

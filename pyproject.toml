@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mkdocs-treeview"
-version = "0.1.0"
+version = "0.2.0"
 description = "MkDocs plugin and Markdown extension for rendering ASCII file trees with material icons"
 readme = "README.md"
 license = { file = "LICENSE" }
