@@ -4,11 +4,18 @@ Parsers for treeview blocks.
 Supports two input formats, auto-detected:
 - ASCII-tree: uses box-drawing characters (│, ├──, └──) from the `tree` command
 - Symbol-based: uses repeating markers (* or #) for depth
+
+In both formats an entry may end with an inline comment: whitespace, ``#`` and
+the comment text (``src/  # sources``).
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
+
+# Whitespace before the "#" keeps names such as "C#" or "#notes" intact.
+_COMMENT = re.compile(r"\s+#(?=\s|$)")
 
 
 @dataclass
@@ -16,6 +23,7 @@ class TreeNode:
     name: str = ""
     children: list[TreeNode] = field(default_factory=list)
     is_root: bool = False
+    comment: str = ""
 
     def has_children(self) -> bool:
         return len(self.children) > 0
@@ -59,6 +67,14 @@ def parse(source: str) -> TreeNode:
     return _parse_symbol(source)
 
 
+def _split_comment(entry: str) -> tuple[str, str]:
+    """Split ``name  # comment`` into the name and the comment text."""
+    match = _COMMENT.search(entry)
+    if match is None:
+        return entry, ""
+    return entry[: match.start()].strip(), entry[match.end() :].strip()
+
+
 def _parse_ascii(source: str) -> TreeNode:
     root = TreeNode(name="", is_root=True)
     stack: list[TreeNode] = [root]
@@ -78,10 +94,11 @@ def _parse_ascii(source: str) -> TreeNode:
             depth = max(1, (last_dash + 1 + 3) // 4)
             name = line[last_dash + 1 :].strip()
 
+        name, comment = _split_comment(name)
         if not name:
             continue
 
-        node = TreeNode(name=name)
+        node = TreeNode(name=name, comment=comment)
 
         # Guard against emptying the stack: depth-0 items attach to root (index 0).
         while len(stack) > max(depth, 1):
@@ -125,10 +142,11 @@ def _parse_symbol(source: str) -> TreeNode:
             depth += 1
 
         name = stripped[depth:].strip()
+        name, comment = _split_comment(name)
         if not name:
             continue
 
-        node = TreeNode(name=name)
+        node = TreeNode(name=name, comment=comment)
 
         while len(stack) > max(depth, 1):
             stack.pop()

@@ -147,3 +147,36 @@ def test_ascii_root_plain_followed_by_indented():
     root = parse("src/\n├── main.py")
     # main.py has a box-drawing char so it gets depth>=1 — it goes under src/
     assert root.children[0].name == "src/"
+
+
+# ── Inline comments ───────────────────────────────────────────────────────────
+
+
+def test_ascii_inline_comment():
+    root = parse("├── src/        # sources\n│   └── main.py  # entry point\n└── README.md")
+    src = root.children[0]
+    assert (src.name, src.comment) == ("src/", "sources")
+    assert (src.children[0].name, src.children[0].comment) == ("main.py", "entry point")
+    assert root.children[1].comment == ""
+
+
+def test_ascii_comment_keeps_folder_without_children():
+    root = parse("└── repository/   # software kits")
+    node = root.children[0]
+    assert node.name == "repository/"
+    assert node.is_folder()
+
+
+def test_symbol_inline_comment():
+    root = parse("* src/ # sources\n** main.py")
+    assert (root.children[0].name, root.children[0].comment) == ("src/", "sources")
+
+
+def test_hash_without_leading_space_is_part_of_name():
+    root = parse("├── C#\n└── notes#1.md")
+    assert [(c.name, c.comment) for c in root.children] == [("C#", ""), ("notes#1.md", "")]
+
+
+def test_empty_comment():
+    root = parse("└── build/ #")
+    assert (root.children[0].name, root.children[0].comment) == ("build/", "")

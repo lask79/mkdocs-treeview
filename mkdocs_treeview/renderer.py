@@ -76,6 +76,11 @@ def _render_node(
 
     escaped = _html.escape(bare if is_folder else name)
     display_name = escaped + ("/" if is_folder else "")
+    comment_html = (
+        f'<span class="tv-item-comment"># {_html.escape(node.comment)}</span>'
+        if node.comment
+        else ""
+    )
 
     lines.append(
         f'<span class="tv-line">'
@@ -83,6 +88,7 @@ def _render_node(
         f'<span class="tv-line-element">'
         f'<i class="tv-icon {css_class}"></i>'
         f'<span class="tv-item-name">{display_name}</span>'
+        f"{comment_html}"
         f"</span>"
         f"</span>"
     )

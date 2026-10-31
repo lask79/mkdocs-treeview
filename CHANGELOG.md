@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Inline comments**: an entry may end with whitespace, `#` and a comment (`src/  # sources`). The comment is rendered muted after the name (`tv-item-comment`) and no longer becomes part of the name, so the icon and folder detection use the name only.
+
 ## [0.2.3] - 2026-06-08
 
 - Fixed some PyPI configs in `pyproject.toml`

@@ -117,3 +117,17 @@ def test_render_escapes_ampersand_in_name():
     html = render(root, registry)
     assert "cats & dogs" not in html
     assert "cats &amp; dogs" in html
+
+
+def test_render_inline_comment():
+    root = parse("└── repository/   # Software <kit> storage")
+    registry = IconRegistry()
+    html = render(root, registry)
+    assert '<span class="tv-item-name">repository/</span>' in html
+    assert '<span class="tv-item-comment"># Software &lt;kit&gt; storage</span>' in html
+    assert "tv-icon-folder" in html
+
+
+def test_render_without_comment_has_no_comment_span():
+    html = render(parse("└── main.py"), IconRegistry())
+    assert "tv-item-comment" not in html

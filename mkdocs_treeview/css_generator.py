@@ -21,6 +21,7 @@ _BASE_CSS = """\
 .tv-line { display: flex; align-items: center; }
 .tv-line-element { display: contents; }
 .tv-item-name { margin-left: 5px; }
+.tv-item-comment { margin-left: 1em; opacity: 0.6; }
 .tv-icon {
   width: 18px;
   height: 18px;

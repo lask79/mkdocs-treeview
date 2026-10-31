@@ -43,6 +43,12 @@ Two input formats are supported, auto-detected:
 Detection logic: if the source contains `│`, `├──`, or `└──` → ascii-tree
 parser; otherwise → symbol parser. Mixed formats throw an error.
 
+**Inline comments** (both formats): an entry may end with whitespace, `#` and
+the comment text (`src/  # sources`). The name before the comment decides the
+icon and whether the entry is a folder. A `#` without whitespace before it is
+part of the name (`C#`). The comment is rendered after the name as
+`<span class="tv-item-comment"># sources</span>`.
+
 ---
 
 ## Architecture

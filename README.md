@@ -77,6 +77,21 @@ Both formats are accepted:
 * README.md
 ```
 
+### Inline comments
+
+End an entry with whitespace, `#` and the text to add a comment. The comment is
+shown muted after the name and is ignored for the icon and the folder detection:
+
+````markdown
+```treeview
+├── src/          # application sources
+│   └── main.py   # entry point
+└── dist/         # build output
+```
+````
+
+A `#` without whitespace before it is part of the name (`C#`, `notes#1.md`).
+
 ---
 
 ## Configuration
